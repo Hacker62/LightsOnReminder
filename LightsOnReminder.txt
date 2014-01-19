@@ -1,0 +1,205 @@
+// Lights on Reminder
+
+#include <Wire.h>     // I2C Wire Library for communicating with the DS1307 RTC
+#include "RTClib.h"   // Date and time functions for the DS1307 RTC connected
+#include <LiquidCrystal.h> // Display functions for the LCD Display
+
+RTC_DS1307 rtc;                         // Create a realtime clock called rtc
+LiquidCrystal lcd(5,6,7,8,9,10);  // Create an LCD called lcd
+
+// Variables
+const int analogPin = A0; // This is where photocell is hooked up.
+const int speakerPin = 2; // Attach piezo or speaker to digital pin 2.
+const int moreGracePin = 3; // Attach a switch to turn off alarm and reset gracePeriod time.
+const int spkrPin = 2; // Piezo '+' side goes to this digital pin.
+const int pitchPin = A1; // Pot wiper goes to this pin.
+int analogValue = 0; // What the photocell gives as a number from 0 to 1024, I think.
+int setAlarm = 0; // This is a test bit. A function will take the place of this to make a speaker sound off.
+
+// Easily change adjustable variables here.
+// *****************************************************************************************************
+int threshold = 250; // Light threshold read at analogPin.
+int gracePeriod = 10; // Alarm will not go off in this period of time in minutes after light is sensed. 
+// *****************************************************************************************************
+
+DateTime now;
+
+void setup ()
+{
+  pinMode(speakerPin, OUTPUT);
+  pinMode(moreGracePin, INPUT);
+  Wire.begin();      // Enables the communication for the RTC.
+  rtc.begin();       // Enables the RTC
+  lcd.begin(16, 2);  // Enables the LCD
+  lcd.print("  It's Alive!");    // Print a message, centered, to the LCD to confirm it's working
+  delay(3000);                    // Wait a moment so we can read it
+  lcd.clear();       // Clear the LCD
+  Serial.begin(9600);
+}
+
+void loop()
+{
+  now = rtc.now(); // Get the current time
+  if (now.hour() >= 21 || now.hour() < 11) // Check for lights on between 9pm and 5am.
+  {
+    int light = readPhotoCell(); // Calls function to get photocell sensor value and assign to light.
+    if (light > threshold)
+    {
+      alarmOn();
+      setAlarm = 1;
+      int val = countDownGracePeriod(gracePeriod, setAlarm);
+
+      //Serial.print("Alarm = ");
+      //Serial.println(val);
+      //delay(100);
+
+      if(val == 1)
+      {
+        lcd.clear();
+        lcd.setCursor(0, 0);  // Set the cursor at the column zero, upper row...
+        lcd.print("  Alarm is on! ");  // ...with spaces to clear characters from setting alarm.
+        alarmOn();
+        setAlarm = 1;
+        int val2 = digitalRead(moreGracePin);
+
+        if(val2 == 1) // Someone is requesting more time with lights on using switch.
+        {
+          alarmOff();
+          setAlarm = 0;
+          countDownGracePeriod(gracePeriod, setAlarm);
+        }
+        else
+        {
+          do // Grace period expired and lights still on so sound alarm.
+          {
+            light = readPhotoCell();  // Calls function to get photocell sensor value and assign to light.
+            alarmOn();
+            setAlarm = 1;
+            int light = readPhotoCell(); // Calls function to get photocell sensor value and assign to light.
+            int val = digitalRead(moreGracePin); // Check if more time is being requested with alarm on.
+            if (light < threshold || val == 1)
+            {
+              //arg2 = 0;
+              break;
+            }
+          }
+          while(light > threshold);
+        }
+
+      }
+    }
+
+    alarmOff();
+    setAlarm = 0;
+    delay(100);
+  }
+
+  // Refresh the display
+  updateDisplay();  
+}
+
+// Define Functions ********************************************************************************
+void updateDisplay()
+{
+  int h = now.hour();   // Get the hours right now and store them in an integer called h
+  int m = now.minute(); // Get the minutes right now and store them in an integer called m
+  int s = now.second(); // Get the seconds right now and store them in an integer called s
+
+  lcd.setCursor(0, 0);  // Set the cursor at the column zero, upper row...
+  lcd.print("  The time is: ");  // ...with spaces to clear characters from setting alarm.
+  lcd.setCursor(4, 1);  // Move the cursor to column four, lower row
+
+  if (h<10)
+  {            // Add a zero, if necessary, as above
+    lcd.print(0);
+  }  
+  lcd.print(h);         // Display the current hour  
+  lcd.setCursor(6, 1);  // Move to the next column
+  lcd.print(":");       // And print the colon
+  lcd.setCursor(7, 1);  // Move to the next column
+  if (m<10){            // Add a zero, if necessary, as above
+    lcd.print(0);
+  }  
+  lcd.print(m);         // Display the current minute
+  lcd.setCursor(9, 1);  // Move to the next column
+  lcd.print(":");       // And print the colon
+  lcd.setCursor(10, 1); // Move to the next column
+  if (s<10)
+  {            // Add a zero, if necessary, as above
+    lcd.print(0);
+  }  
+  lcd.print(s);         // Display the current second
+
+}
+//////////////////
+int countDownGracePeriod(int arg1, int arg2) // arg1 is gracePeriod, arg2 is setAlarm
+{
+  for(int i = arg1; i > 0; i--)
+  {
+    if (arg2 == 1)
+    {
+      int light = readPhotoCell(); // Calls function to get photocell sensor value and assign to light.
+      if (light < threshold || moreGracePin == 1)
+      {
+        arg2 = 0;
+        break;
+      }
+    }
+
+    for(int j = 0; j < 60; j++) // Count down seconds.
+    {
+      delay(10);
+      if (arg2 == 1) // Check if lights are off or if more gracePeriod is requested. 
+      {
+        int light = readPhotoCell(); // Calls function to get photocell sensor value and assign to light.
+        int val = digitalRead(moreGracePin);
+        if (light < threshold || val == 1)
+        {
+          arg2 = 0;
+          break;
+        }
+      }
+      lcd.clear();
+      lcd.setCursor(0, 0);  // Set the cursor at the column zero, upper row...
+      lcd.print("Minutes left: ");
+      lcd.setCursor(0, 1);
+      lcd.print(i);
+    }
+
+    if(arg2 == 0)
+      break;
+  }
+  lcd.clear();
+  return arg2;
+}
+//////////////////////
+int readPhotoCell()
+{
+  int analogValue = analogRead(analogPin);
+  Serial.print("analog value = ");
+  Serial.println(analogValue, DEC);
+  delay(250);
+  return analogValue;
+}
+//////////////////////
+void alarmOn()
+{
+  int readPot = analogRead(pitchPin); // Read pot wiper volts to set freq.
+
+  // Map readings to a meaningful range.
+  unsigned int freq = map(readPot, 0, 1023, 100, 5000); // Analog values 0 to 1023 correspond to 100Hz to 5000Hz.
+  unsigned long time = 500;
+
+  tone(spkrPin, freq, time);
+  delay(500);
+  tone(spkrPin, 0, time);
+  delay(500);
+}
+/////////////////////
+void alarmOff()
+{
+  noTone(spkrPin);
+}
+
+
+
