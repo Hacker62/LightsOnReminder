@@ -9,7 +9,6 @@ LiquidCrystal lcd(5,6,7,8,9,10);  // Create an LCD called lcd
 
 // Variables
 const int analogPin = A0; // This is where photocell is hooked up.
-const int speakerPin = 2; // Attach piezo or speaker to digital pin 2.
 const int moreGracePin = 3; // Attach a switch to turn off alarm and reset gracePeriod time.
 const int spkrPin = 2; // Piezo '+' side goes to this digital pin.
 const int pitchPin = A1; // Pot wiper goes to this pin.
@@ -19,14 +18,14 @@ int setAlarm = 0; // This is a test bit. A function will take the place of this 
 // Easily change adjustable variables here.
 // *****************************************************************************************************
 int threshold = 250; // Light threshold read at analogPin.
-int gracePeriod = 10; // Alarm will not go off in this period of time in minutes after light is sensed. 
+int gracePeriod = 60; // Alarm will not go off in this period of time in minutes after light is sensed. 
 // *****************************************************************************************************
 
 DateTime now;
 
 void setup ()
 {
-  pinMode(speakerPin, OUTPUT);
+  pinMode(spkrPin, OUTPUT);
   pinMode(moreGracePin, INPUT);
   Wire.begin();      // Enables the communication for the RTC.
   rtc.begin();       // Enables the RTC
@@ -48,10 +47,6 @@ void loop()
       alarmOn();
       setAlarm = 1;
       int val = countDownGracePeriod(gracePeriod, setAlarm);
-
-      //Serial.print("Alarm = ");
-      //Serial.println(val);
-      //delay(100);
 
       if(val == 1)
       {
