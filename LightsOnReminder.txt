@@ -4,42 +4,47 @@
 #include "RTClib.h"   // Date and time functions for the DS1307 RTC connected
 #include <LiquidCrystal.h> // Display functions for the LCD Display
 
-RTC_DS1307 rtc;                         // Create a realtime clock called rtc
+RTC_DS1307 rtc;                   // Create a realtime clock called rtc
 LiquidCrystal lcd(5,6,7,8,9,10);  // Create an LCD called lcd
 
 // Variables
-const int analogPin = A0; // This is where photocell is hooked up.
+const int analogPin = A0;   // This is where photocell is hooked up.
 const int moreGracePin = 3; // Attach a switch to turn off alarm and reset gracePeriod time.
-const int spkrPin = 2; // Piezo '+' side goes to this digital pin.
-const int pitchPin = A1; // Pot wiper goes to this pin.
-int analogValue = 0; // What the photocell gives as a number from 0 to 1024, I think.
-int setAlarm = 0; // This is a test bit. A function will take the place of this to make a speaker sound off.
+const int spkrPin = 2;      // Piezo '+' side goes to this digital pin.
+const int pitchPin = A1;    // Pot wiper goes to this pin.
+int analogValue = 0;        // What the photocell gives as a number from 0 to 1024, I think.
+int setAlarm = 0;           // This is a test bit. A function will take the place of this to make a speaker sound off.
 
 // Easily change adjustable variables here.
-// *****************************************************************************************************
-int threshold = 250; // Light threshold read at analogPin.
-int gracePeriod = 60; // Alarm will not go off in this period of time in minutes after light is sensed. 
-// *****************************************************************************************************
+// ***********************************************************************************************************
+// ***********************************************************************************************************
+int threshold = 200;  // Light threshold read at analogPin.
+int gracePeriod = 60; // Alarm will not go off in this period of time in minutes after light is sensed.
+int startMonLgt = 21; // Begin monitoring status of room lights. If on, show and count down gracePeriod time.
+                      // Time is in military time, ie. 00 is midnight, 23 is 11 pm, 1 is 1 am, etc.
+int endMonLgt = 5;    // End monitoring status of room lights. Go back to displaying time.
+// ***********************************************************************************************************
+// ***********************************************************************************************************
 
-DateTime now;
+DateTime now;        // WTF? Not sure if I need this so I better leave it alone.
 
 void setup ()
 {
   pinMode(spkrPin, OUTPUT);
   pinMode(moreGracePin, INPUT);
-  Wire.begin();      // Enables the communication for the RTC.
-  rtc.begin();       // Enables the RTC
-  lcd.begin(16, 2);  // Enables the LCD
+  Wire.begin();                  // Enables the communication for the RTC.
+  rtc.begin();                   // Enables the RTC
+  lcd.begin(16, 2);              // Enables the LCD
   lcd.print("  It's Alive!");    // Print a message, centered, to the LCD to confirm it's working
-  delay(3000);                    // Wait a moment so we can read it
-  lcd.clear();       // Clear the LCD
+  delay(3000);                   // Wait a moment so we can read it
+  lcd.clear();                   // Clear the LCD
   Serial.begin(9600);
-}
+}  
 
 void loop()
 {
   now = rtc.now(); // Get the current time
-  if (now.hour() >= 21 || now.hour() < 11) // Check for lights on between 9pm and 5am.
+  if (now.hour() >= startMonLgt || now.hour() < endMonLgt) // Check for lights on between 9pm and 5am.
   {
     int light = readPhotoCell(); // Calls function to get photocell sensor value and assign to light.
     if (light > threshold)
@@ -134,8 +139,8 @@ int countDownGracePeriod(int arg1, int arg2) // arg1 is gracePeriod, arg2 is set
     if (arg2 == 1)
     {
       int light = readPhotoCell(); // Calls function to get photocell sensor value and assign to light.
-      if (light < threshold || moreGracePin == 1)
-      {
+      if (light < threshold || moreGracePin == 1) // If light is off or there is a request for more grace time
+      {                                           // then set arg2 (setAlarm flag) to 0 flag then get out of loop.
         arg2 = 0;
         break;
       }
@@ -143,13 +148,13 @@ int countDownGracePeriod(int arg1, int arg2) // arg1 is gracePeriod, arg2 is set
 
     for(int j = 0; j < 60; j++) // Count down seconds.
     {
-      delay(1000);
+      delay(1000); // Adjust this number to get countdown of seconds more accurate if needed. 1000 ms = 1 second.
       if (arg2 == 1) // Check if lights are off or if more gracePeriod is requested. 
       {
         int light = readPhotoCell(); // Calls function to get photocell sensor value and assign to light.
         int val = digitalRead(moreGracePin);
-        if (light < threshold || val == 1)
-        {
+        if (light < threshold || val == 1)   // If light is off or there is a request for more grace time
+        {                                    // then set arg2 (setAlarm flag) to 0 flag then get out of loop.
           arg2 = 0;
           break;
         }
