@@ -184,21 +184,15 @@ int readPhotoCell()
 //////////////////////
 void alarmOn()
 {
-  int readPot = analogRead(pitchPin); // Read pot wiper volts to set freq.
-
-  // Map readings to a meaningful range.
-  unsigned int freq = map(readPot, 0, 1023, 100, 5000); // Analog values 0 to 1023 correspond to 100Hz to 5000Hz.
-  unsigned long time = 500;
-
-  tone(spkrPin, freq, time);
+  digitalWrite(spkrPin, HIGH);
   delay(500);
-  tone(spkrPin, 0, time);
+  digitalWrite(spkrPin, LOW);
   delay(500);
 }
 /////////////////////
 void alarmOff()
 {
-  noTone(spkrPin);
+  digitalWrite(spkrPin, LOW);
 }
 
 
